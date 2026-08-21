@@ -1,6 +1,6 @@
 const apiKey = "ebc5cc8c";
 const minSearchLength = 4;
-const noImageUrl = "/assets/no-img.jpg";
+const noImageUrl = "./assets/no-img.jpg";
 
 const styles = `
   :root {
