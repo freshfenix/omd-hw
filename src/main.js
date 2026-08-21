@@ -144,6 +144,38 @@ const styles = `
     transform: scale(1.03);
   }
 
+  .load-more {
+    display: block;
+    margin: 28px auto 0;
+    padding: 12px 22px;
+    border: 0;
+    border-radius: 8px;
+    background: #2563eb;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+    transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+  }
+
+  .load-more:hover {
+    background: #1d4ed8;
+    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .load-more:disabled {
+    background: #9ca3af;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .load-more.is-hidden {
+    display: none;
+  }
+
   @media (max-width: 560px) {
     .app {
       padding: 28px 12px;
@@ -169,9 +201,15 @@ const checkboxLabel = document.createElement("label");
 const clearCheckbox = document.createElement("input");
 const message = document.createElement("p");
 const results = document.createElement("div");
+const loadMoreButton = document.createElement("button");
 
 let shouldClearBeforeSearch = true;
 let lastSearchValue = "";
+let currentSearchValue = "";
+let currentPage = 1;
+let totalResults = 0;
+let currentResultsCount = 0;
+let isLoading = false;
 
 const debounce = (() => {
   let timerId = null;
@@ -209,10 +247,13 @@ function createMovieApp() {
   message.classList.add("message");
   results.classList.add("results");
   results.id = "results";
+  loadMoreButton.type = "button";
+  loadMoreButton.textContent = "Load more";
+  loadMoreButton.classList.add("load-more", "is-hidden");
 
   app.append(container);
   controls.append(search, checkboxLabel);
-  container.append(title, controls, message, results);
+  container.append(title, controls, message, results, loadMoreButton);
   document.body.append(app);
 }
 
@@ -224,8 +265,15 @@ function setMessage(text = "") {
   message.textContent = text;
 }
 
-async function getData(searchValue) {
-  const url = `https://www.omdbapi.com/?apikey=${apiKey}&s=${encodeURIComponent(searchValue)}`;
+function updateLoadMoreButton() {
+  const hasMoreResults = currentResultsCount < totalResults;
+
+  loadMoreButton.classList.toggle("is-hidden", !hasMoreResults || !currentSearchValue);
+  loadMoreButton.disabled = isLoading;
+}
+
+async function getData(searchValue, page = 1) {
+  const url = `https://www.omdbapi.com/?apikey=${apiKey}&s=${encodeURIComponent(searchValue)}&page=${page}`;
   const response = await fetch(url);
   const data = await response.json();
 
@@ -233,7 +281,10 @@ async function getData(searchValue) {
     throw new Error(data.Error || "Movies not found");
   }
 
-  return data.Search;
+  return {
+    movies: data.Search,
+    totalResults: Number(data.totalResults) || data.Search.length,
+  };
 }
 
 function addMovieToList({ Poster: poster, Title: title, Year: year, Type: type }) {
@@ -259,7 +310,7 @@ function addMovieToList({ Poster: poster, Title: title, Year: year, Type: type }
   };
 
   card.append(movieTitle, movieYear, movieType, image);
-  results.prepend(card);
+  results.append(card);
 }
 
 function inputSearchHandler(event) {
@@ -270,11 +321,20 @@ function inputSearchHandler(event) {
       clearMoviesMarkup();
       setMessage("");
       lastSearchValue = "";
+      currentSearchValue = "";
+      currentPage = 1;
+      totalResults = 0;
+      currentResultsCount = 0;
+      updateLoadMoreButton();
       return;
     }
 
     if (searchValue.length < minSearchLength) {
       setMessage(`Type at least ${minSearchLength} characters`);
+      currentSearchValue = "";
+      totalResults = 0;
+      currentResultsCount = 0;
+      updateLoadMoreButton();
       return;
     }
 
@@ -286,25 +346,69 @@ function inputSearchHandler(event) {
       clearMoviesMarkup();
     }
 
+    currentSearchValue = searchValue;
+    currentPage = 1;
+    totalResults = 0;
+    currentResultsCount = 0;
+    isLoading = true;
+    updateLoadMoreButton();
     setMessage("Searching...");
 
     try {
-      const movies = await getData(searchValue);
+      const result = await getData(searchValue, currentPage);
+      const movies = result.movies;
+
+      totalResults = result.totalResults;
+      currentResultsCount = movies.length;
       movies.forEach(addMovieToList);
       setMessage("");
     } catch (error) {
       clearMoviesMarkup();
+      currentSearchValue = "";
+      totalResults = 0;
+      currentResultsCount = 0;
       setMessage(error.message);
+    } finally {
+      isLoading = false;
+      updateLoadMoreButton();
     }
 
     lastSearchValue = searchValue;
   }, 1000);
 }
 
+async function loadMoreMovies() {
+  if (!currentSearchValue || isLoading) {
+    return;
+  }
+
+  isLoading = true;
+  currentPage += 1;
+  loadMoreButton.textContent = "Loading...";
+  updateLoadMoreButton();
+  setMessage("");
+
+  try {
+    const result = await getData(currentSearchValue, currentPage);
+
+    totalResults = result.totalResults;
+    currentResultsCount += result.movies.length;
+    result.movies.forEach(addMovieToList);
+  } catch (error) {
+    currentPage -= 1;
+    setMessage(error.message);
+  } finally {
+    isLoading = false;
+    loadMoreButton.textContent = "Load more";
+    updateLoadMoreButton();
+  }
+}
+
 search.addEventListener("input", inputSearchHandler);
 clearCheckbox.addEventListener("change", (event) => {
   shouldClearBeforeSearch = event.target.checked;
 });
+loadMoreButton.addEventListener("click", loadMoreMovies);
 
 addStyles();
 createMovieApp();
