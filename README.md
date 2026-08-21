@@ -40,9 +40,9 @@ omdd-hw/
 ├── public/
 │   ├── assets/
 │   │   └── no-img.jpg
-│   └── favicon.svg
 ├── src/
 │   └── main.js
+├── vite.config.js
 ├── index.html
 ├── package.json
 └── README.md
@@ -77,8 +77,40 @@ npm run build
 Готові файли будуть створені в папці:
 
 ```text
-dist/
+docs/
 ```
+
+## Публікація на GitHub Pages
+
+Проєкт налаштований так, щоб production-збірка створювалась у папці `docs`. Це зручно для GitHub Pages.
+
+Щоб опублікувати проєкт:
+
+1. Виконати збірку:
+
+```bash
+npm run build
+```
+
+2. Завантажити зміни в GitHub.
+
+3. У налаштуваннях репозиторію відкрити:
+
+```text
+Settings -> Pages
+```
+
+4. У блоці `Build and deployment` вибрати:
+
+```text
+Source: Deploy from a branch
+Branch: main
+Folder: /docs
+```
+
+5. Зберегти налаштування.
+
+У `vite.config.js` встановлено `base: "./"`, тому зібрані файли мають коректно працювати на GitHub Pages навіть якщо сайт відкривається не з кореня домену, а з адреси репозиторію.
 
 ## Перегляд production-збірки
 
